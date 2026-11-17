@@ -1,6 +1,5 @@
-// Mod de moveset : "Mumbo" (hôte : Ness). Squelette smashline 2.
-// ATTENTION : non compilé ni testé en jeu. Les noms de macros/APIs sont à valider
-// contre ta version exacte de smashline / smash-script.
+// Mod de moveset : "Mumbo Jumbo" (hôte : Ness), smashline 2.
+mod state;
 mod fighter_frame;
 mod specials;
 mod normals;

@@ -1,48 +1,71 @@
-// Jauge de crânes (0..=3) : variable de work de l'hôte, gain par dégâts infligés, effet sur le bâton.
+// Jauge de crânes (0..=3) : gain par dégâts des attaques normales + gain passif, effet violet sur le bâton.
+use crate::state::*;
 use smash::app::lua_bind::*;
 use smash::lib::lua_const::*;
 use smash::lua2cpp::L2CFighterCommon;
+use smash::phx::Hash40;
+use smash_script::*;
 use smashline::*;
 
-/// Variable de work libre (à adapter si elle entre en collision avec une autre du mod).
-pub const SKULLS: i32 = 0x1000_0001;
-/// Cumul de dégâts infligés depuis le dernier crâne (stocké en flottant).
-pub const DMG_ACC: i32 = 0x1000_0002;
-pub const MAX_SKULLS: i32 = 3;
-/// Un crâne tous les X % de dégâts normaux infligés.
-pub const DMG_PER_SKULL: f32 = 30.0;
+unsafe fn is_normal_attack(status: i32) -> bool {
+    [
+        *FIGHTER_STATUS_KIND_ATTACK,
+        *FIGHTER_STATUS_KIND_ATTACK_100,
+        *FIGHTER_STATUS_KIND_ATTACK_DASH,
+        *FIGHTER_STATUS_KIND_ATTACK_S3,
+        *FIGHTER_STATUS_KIND_ATTACK_HI3,
+        *FIGHTER_STATUS_KIND_ATTACK_LW3,
+        *FIGHTER_STATUS_KIND_ATTACK_S4,
+        *FIGHTER_STATUS_KIND_ATTACK_HI4,
+        *FIGHTER_STATUS_KIND_ATTACK_LW4,
+        *FIGHTER_STATUS_KIND_ATTACK_AIR,
+    ]
+    .contains(&status)
+}
 
 unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
-    let module_accessor = fighter.module_accessor;
-    let status = StatusModule::status_kind(module_accessor);
+    let boma = fighter.module_accessor;
+    let status = StatusModule::status_kind(boma);
 
-    // Réinitialisation à la mort / au respawn.
-    if status == *FIGHTER_STATUS_KIND_ENTRY || status == *FIGHTER_STATUS_KIND_DEAD {
-        WorkModule::set_int(module_accessor, 0, SKULLS);
-        WorkModule::set_float(module_accessor, 0.0, DMG_ACC);
+    // Réinitialisation à l'entrée, à la mort et au respawn.
+    if status == *FIGHTER_STATUS_KIND_ENTRY
+        || status == *FIGHTER_STATUS_KIND_DEAD
+        || status == *FIGHTER_STATUS_KIND_REBIRTH
+    {
+        reset(boma);
+        return;
+    }
+    let s = st(boma);
+
+    // Gain par les coups normaux : on compte une fois par contact (front montant).
+    let inflicting = AttackModule::is_infliction(boma, *COLLISION_KIND_MASK_HIT);
+    if inflicting && !s.hit_latched && is_normal_attack(status) {
+        let power = AttackModule::get_power(boma, 0, false, 1.0, false);
+        s.dmg_acc += if power > 0.0 { power } else { 5.0 };
+    }
+    s.hit_latched = inflicting;
+    while s.dmg_acc >= DMG_PER_SKULL {
+        s.dmg_acc -= DMG_PER_SKULL;
+        gain_skull(s);
+    }
+
+    if !smash::app::sv_information::is_ready_go() {
         return;
     }
 
-    // Gain : on lit le dernier hit porté par une attaque normale.
-    // (À affiner : brancher ici le hook sur le dégât réellement infligé.)
-    let skulls = WorkModule::get_int(module_accessor, SKULLS);
-    if skulls < MAX_SKULLS && WorkModule::get_float(module_accessor, DMG_ACC) >= DMG_PER_SKULL {
-        WorkModule::set_int(module_accessor, skulls + 1, SKULLS);
-        WorkModule::set_float(module_accessor, 0.0, DMG_ACC);
+    // Gain passif (le « timer » de la spec).
+    s.passive_timer += 1;
+    if s.passive_timer >= PASSIVE_FRAMES {
+        s.passive_timer = 0;
+        gain_skull(s);
     }
 
-    // Indicateur visuel : une particule sur le bâton, d'intensité = nombre de crânes.
-    // Placeholder : à remplacer par des effets du mod une fois ton modèle intégré.
-    let skulls = WorkModule::get_int(module_accessor, SKULLS);
-    if skulls > 0 && smash::app::sv_information::is_ready_go() && MotionModule::frame(module_accessor) as i32 % 8 == 0 {
-        // EffectModule::req_follow(module_accessor, Hash40::new("ness_pkflash_hold"), Hash40::new("haver"), &Vector3f{x:0.0,y:0.0,z:0.0}, &Vector3f{x:0.0,y:0.0,z:0.0}, 0.3 * skulls as f32, false, 0, 0, 0, 0, 0, false, false);
+    // Indicateur : étincelle violette sur le bâton, plus grosse avec le nombre de crânes.
+    if s.skulls > 0 && s.passive_timer % 20 == 0 {
+        let size = 0.15 + 0.12 * s.skulls as f32;
+        macros::EFFECT_FOLLOW(fighter, Hash40::new("sys_hit_magic"), Hash40::new("haver"), 0, 0, 0, 0, 0, 0, size, true);
+        macros::LAST_EFFECT_SET_COLOR(fighter, 0.6, 0.2, 1.0);
     }
-}
-
-/// À appeler depuis les scripts de normales : ajoute les dégâts d'un coup connecté.
-pub unsafe fn add_damage(module_accessor: *mut smash::app::BattleObjectModuleAccessor, dmg: f32) {
-    let acc = WorkModule::get_float(module_accessor, DMG_ACC);
-    WorkModule::set_float(module_accessor, acc + dmg, DMG_ACC);
 }
 
 pub fn install() {

@@ -1,6 +1,5 @@
 // Jab, tilts, smashs, aériennes. Chaque coup connecté alimente la jauge de crânes.
 // Les valeurs (frames, dégâts, angles) sont un point de départ à équilibrer en jeu.
-use crate::fighter_frame::add_damage;
 use smash::app::lua_bind::*;
 use smash::lib::lua_const::*;
 use smash::lua2cpp::L2CAgentBase;
@@ -136,12 +135,6 @@ unsafe extern "C" fn game_attackairlw(a: &mut L2CAgentBase) {
     }
     wait(a.lua_state_agent, 6.0);
     if macros::is_excute(a) { AttackModule::clear_all(a.module_accessor); }
-}
-
-/// Gain de crânes : tout coup normal connecté ajoute ses dégâts à l'accumulateur.
-/// Appelé à chaque frame depuis la boucle principale (voir `fighter_frame`).
-pub unsafe fn on_normal_hit(module_accessor: *mut smash::app::BattleObjectModuleAccessor, dmg: f32) {
-    add_damage(module_accessor, dmg);
 }
 
 pub fn install() {
