@@ -1,22 +1,26 @@
-# Mumbo Jumbo — moveset SSBU (Skyline / smashline 2)
+# Mumbo Jumbo (SSBU, Skyline + smashline 2)
 
-Mod de moveset fan-made pour **Super Smash Bros. Ultimate**, remplaçant **Ness**.
-Ce dépôt contient uniquement du code (aucun asset du jeu ni modèle 3D).
+Moveset de Mumbo Jumbo qui remplace **Ness**.
 
-> Statut : en développement, pas encore compilé ni testé en jeu.
+## Mécaniques
+- **Jauge de crânes 0-3** : +1 crâne tous les 30 % infligés avec les attaques normales, +1 toutes les 20 s. Étincelle violette sur le bâton.
+- **B neutre – Zap** : 3 paliers de charge (maintenir B).
+- **B côté** : Termite (0 crâne) / Croco (1+ crâne, consomme 1).
+- **B haut** : lévitation multi-coups puis chute spéciale.
+- **B bas – socle** : 0 crâne = ralentit, 1 = paralyse (−1), 2+ = enterre (−2).
+- Normales, smashs, aériennes, Final Smash « Eekum Bokum » (squelette).
 
-## Contenu
-- `src/fighter_frame.rs` — jauge de crânes (0–3), gain par dégâts infligés
-- `src/specials.rs` — Neutral B (Zap, 3 paliers), Down B (Socle : lenteur / étourdissement / transformation)
-- `src/normals.rs` — jab, tilts, smashs, aériennes
-- `src/final_smash.rs` — Final Smash (zone, rafale d'éclairs, explosion)
-
-## Compilation
-Prérequis : Rust nightly, [cargo-skyline](https://github.com/jam1garner/cargo-skyline), git, Visual Studio Build Tools (C++).
-
+## Compiler
 ```
 cargo skyline build --release
 ```
+Sortie : `target/aarch64-skyline-switch/release/libmumbo_mod.nro`
 
-Le `.nro` produit se place dans `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`
-avec Skyline et le plugin smashline installés.
+## Installer (Ryujinx)
+Copier `libmumbo_mod.nro` et `libsmashline_plugin.nro` dans
+`%APPDATA%\Ryujinx\sdcard\atmosphere\contents\01006a800016e000\romfs\skyline\plugins\`.
+Skyline doit être installé dans `mods\contents\01006a800016e000\skyline\exefs\`.
+
+## Tester
+Jouer un match avec Ness, puis chercher `[mumbo_mod]` dans le dossier `Logs` de Ryujinx :
+une ligne « animation '…' introuvable » signale un nom d'animation à corriger dans `src/specials.rs`.
