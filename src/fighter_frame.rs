@@ -34,7 +34,7 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
     // Indicateur visuel : une particule sur le bâton, d'intensité = nombre de crânes.
     // Placeholder : à remplacer par des effets du mod une fois ton modèle intégré.
     let skulls = WorkModule::get_int(module_accessor, SKULLS);
-    if skulls > 0 && sv_information::is_ready_go() && MotionModule::frame(module_accessor) as i32 % 8 == 0 {
+    if skulls > 0 && smash::app::sv_information::is_ready_go() && MotionModule::frame(module_accessor) as i32 % 8 == 0 {
         // EffectModule::req_follow(module_accessor, Hash40::new("ness_pkflash_hold"), Hash40::new("haver"), &Vector3f{x:0.0,y:0.0,z:0.0}, &Vector3f{x:0.0,y:0.0,z:0.0}, 0.3 * skulls as f32, false, 0, 0, 0, 0, 0, false, false);
     }
 }

@@ -3,3 +3,4 @@ Cargo.lock
 build_out.txt
 build_err.txt
 *.nro
+build_clean.txt

@@ -5,6 +5,7 @@ use smash::lib::lua_const::*;
 use smash::lua2cpp::L2CAgentBase;
 use smash_script::*;
 use smashline::*;
+use smash::app::sv_animcmd::frame;
 
 /// Niveau de charge du Zap (0..=2) — variable de work.
 const ZAP_LVL: i32 = 0x1000_0010;
@@ -18,14 +19,14 @@ unsafe extern "C" fn game_specialn(agent: &mut L2CAgentBase) {
     }
     // Charge : on avance de palier toutes les 14 frames tant que B est maintenu.
     for lvl in 1..=2 {
-        macros::frame(agent.lua_state_agent, 14.0 * lvl as f32);
+        frame(agent.lua_state_agent, 14.0 * lvl as f32);
         if macros::is_excute(agent) {
             if ControlModule::check_button_on(module_accessor, *CONTROL_PAD_BUTTON_SPECIAL) {
                 WorkModule::set_int(module_accessor, lvl, ZAP_LVL);
             }
         }
     }
-    macros::frame(agent.lua_state_agent, 30.0);
+    frame(agent.lua_state_agent, 30.0);
     if macros::is_excute(agent) {
         let lvl = WorkModule::get_int(module_accessor, ZAP_LVL);
         // Dégâts : 5 / 9 / 14 ; hitbox : plus grosse à chaque palier (mise à l'échelle de l'article).
@@ -46,7 +47,7 @@ const PAD_EFFECT: i32 = 0x1000_0011;
 
 unsafe extern "C" fn game_speciallw(agent: &mut L2CAgentBase) {
     let module_accessor = agent.module_accessor;
-    macros::frame(agent.lua_state_agent, 12.0);
+    frame(agent.lua_state_agent, 12.0);
     if macros::is_excute(agent) {
         let skulls = WorkModule::get_int(module_accessor, SKULLS);
         let (effect, cost) = match skulls {
