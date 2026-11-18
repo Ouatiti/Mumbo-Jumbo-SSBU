@@ -163,7 +163,8 @@ unsafe extern "C" fn final_main(fighter: &mut L2CFighterCommon) -> L2CValue {
         KineticModule::change_kinetic(boma, *FIGHTER_KINETIC_TYPE_AIR_STOP);
         MotionModule::change_motion(boma, Hash40::new("fall"), 0.0, 1.0, false, 0.0, false, false);
     }
-    // (pas de zoom caméra : la statue géante doit rester entièrement visible)
+    // caméra légèrement reculée (facteur < 1) : la statue géante doit rester entièrement visible
+    macros::CAM_ZOOM_IN_arg5(fighter, 10.0, 0.0, 0.7, 0.0, 0.0);
     let mut v = L2CValue::new_void();
     v.val_type = L2CValueType::Pointer;
     v.inner.raw = final_loop as *const () as u64;

@@ -70,6 +70,9 @@ unsafe extern "C" fn effect_appeals(a: &mut L2CAgentBase) {
             macros::EFFECT_FOLLOW(a, Hash40::new("sys_aura_light"), Hash40::new("handl"), 0, dy, dz, 0, 0, 0, 0.18, true);
             macros::LAST_EFFECT_SET_COLOR(a, r, g, b);
             macros::LAST_EFFECT_SET_ALPHA(a, 0.8);
+            // cœur coloré non additif : le Glowbo reste visible sur les décors clairs
+            macros::EFFECT_FOLLOW(a, Hash40::new("sys_hit_magic"), Hash40::new("handl"), 0, dy, dz, 0, 0, 0, 0.08, true);
+            macros::LAST_EFFECT_SET_COLOR(a, r, g, b);
         }
         wait(a.lua_state_agent, 4.0);
     }

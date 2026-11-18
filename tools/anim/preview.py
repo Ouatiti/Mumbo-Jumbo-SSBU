@@ -9,6 +9,13 @@ if actname == 'REST':
     if arm.animation_data: arm.animation_data.action = None
     for pb in arm.pose.bones: pb.matrix_basis.identity()
     fr = (0, 0)
+elif actname.endswith('.nuanmb'):
+    bpy.context.view_layer.objects.active = arm
+    arm.animation_data_create(); arm.animation_data.action = None
+    bpy.ops.sub.import_anim(filepath=actname, include_transform_track=True, include_material_track=False,
+                            include_visibility_track=False, first_blender_frame=0)
+    act = arm.animation_data.action
+    fr = act.frame_range
 else:
     act = bpy.data.actions[actname]
     arm.animation_data.action = act
@@ -25,7 +32,9 @@ for o in list(bpy.data.objects):
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam'))
 sc.collection.objects.link(cam); sc.camera = cam
 cam.data.type = 'ORTHO'; cam.data.ortho_scale = 18
-views = {'front': ((0, -30, 7.5), (math.radians(90), 0, 0)), 'side': ((30, 0, 7.5), (math.radians(90), 0, math.radians(90)))}
+views = {'front': ((0, -30, 7.5), (math.radians(90), 0, 0)), 'side': ((30, 0, 7.5), (math.radians(90), 0, math.radians(90))),
+         'game': ((-30, 0, 7.5), (math.radians(90), 0, math.radians(-90)))}
+views = {k: views[k] for k in os.environ.get('PV_VIEWS', 'front,side').split(',')}
 tiles = []
 tmp = os.path.join(os.path.dirname(out), '_t.png')
 for v, (loc, rot) in views.items():
