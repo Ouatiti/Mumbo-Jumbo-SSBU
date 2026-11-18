@@ -11,6 +11,7 @@ use smash::phx::Hash40;
 unsafe extern "C" fn game_finalstart(a: &mut L2CAgentBase) {
     frame(a.lua_state_agent, 20.0);
     if macros::is_excute(a) {
+        macros::CAM_ZOOM_IN_arg5(a, 4.0, 0.0, 1.8, 0.0, 0.0);
         // Zone d'activation devant Mumbo : détecte et capture les adversaires.
         macros::ATTACK(a, 0, 0, Hash40::new("top"), 0.0, 361, 100, 0, 0, 14.0, 0.0, 10.0, 22.0,
             None, None, None, 1.0, 1.0, *ATTACK_SETOFF_KIND_OFF, *ATTACK_LR_CHECK_F, false, 0, 0.0, 0,
@@ -42,8 +43,12 @@ unsafe extern "C" fn game_finalattack(a: &mut L2CAgentBase) {
             *COLLISION_PART_MASK_ALL, false, Hash40::new("collision_attr_elec"), *ATTACK_SOUND_LEVEL_L,
             *COLLISION_SOUND_ATTR_ELEC, *ATTACK_REGION_OBJECT);
     }
+    if macros::is_excute(a) { macros::QUAKE(a, *CAMERA_QUAKE_KIND_L); }
     wait(a.lua_state_agent, 3.0);
-    if macros::is_excute(a) { AttackModule::clear_all(a.module_accessor); }
+    if macros::is_excute(a) {
+        AttackModule::clear_all(a.module_accessor);
+        macros::CAM_ZOOM_OUT(a);
+    }
 }
 
 pub fn install() {
