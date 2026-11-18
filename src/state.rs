@@ -1,17 +1,17 @@
-// État propre à chaque joueur (indexé par l'entry id 0..7).
-// On évite les variables de work du jeu : leurs id sont déjà utilisés par le moteur.
+﻿// Ã‰tat propre Ã  chaque joueur (indexÃ© par l'entry id 0..7).
+// On Ã©vite les variables de work du jeu : leurs id sont dÃ©jÃ  utilisÃ©s par le moteur.
 use smash::app::lua_bind::WorkModule;
 use smash::app::BattleObjectModuleAccessor;
 use smash::lib::lua_const::*;
 
-/// Combattant hôte du mod. "ness" en production ; "mario" pour tester sur une sauvegarde
-/// où Ness n'est pas encore débloqué.
+/// Combattant hÃ´te du mod. "ness" en production ; "mario" pour tester sur une sauvegarde
+/// oÃ¹ Ness n'est pas encore dÃ©bloquÃ©.
 pub const HOST: &str = "ness";
 
 pub const MAX_SKULLS: i32 = 3;
-/// Un crâne tous les X % de dégâts infligés par les attaques normales.
+/// Un crÃ¢ne tous les X % de dÃ©gÃ¢ts infligÃ©s par les attaques normales.
 pub const DMG_PER_SKULL: f32 = 30.0;
-/// Gain passif : un crâne toutes les 20 s de combat (60 frames/s).
+/// Gain passif : un crÃ¢ne toutes les 20 s de combat (60 frames/s).
 pub const PASSIVE_FRAMES: i32 = 1200;
 
 #[derive(Clone, Copy)]
@@ -20,7 +20,7 @@ pub struct MumboState {
     pub dmg_acc: f32,
     pub hit_latched: bool,
     pub passive_timer: i32,
-    // Spéciaux
+    // SpÃ©ciaux
     pub timer: i32,
     pub zap_lvl: i32,
     pub fire_frame: i32,
@@ -62,6 +62,6 @@ pub unsafe fn reset(boma: *mut BattleObjectModuleAccessor) {
 pub fn gain_skull(s: &mut MumboState) {
     if s.skulls < MAX_SKULLS {
         s.skulls += 1;
-        println!("[mumbo_mod] crâne gagné -> {}", s.skulls);
+        println!("[mumbo_mod] crÃ¢ne gagnÃ© -> {}", s.skulls);
     }
 }
