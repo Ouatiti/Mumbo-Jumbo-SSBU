@@ -73,3 +73,13 @@ function Combo([byte]$dir, [byte]$btn, [int]$ms = 200) {
   [W]::keybd_event($btn, 0, 2, [UIntPtr]::Zero); [W]::keybd_event($dir, 0, 2, [UIntPtr]::Zero)
   Start-Sleep -Milliseconds 120
 }
+
+function ShotFull([string]$path) {
+  $p = Get-Ryu; if (-not $p) { "pas de fenetre"; return }
+  Focus-Ryu $p; Start-Sleep -Milliseconds 700
+  $r = New-Object W+RECT; [W]::GetWindowRect($p.MainWindowHandle, [ref]$r) | Out-Null
+  $w = $r.R - $r.L; $h = $r.B - $r.T
+  $bmp = New-Object System.Drawing.Bitmap $w, $h
+  $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($r.L, $r.T, 0, 0, (New-Object System.Drawing.Size $w, $h))
+  $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose(); "ok $path"
+}
