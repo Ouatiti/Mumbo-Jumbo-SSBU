@@ -4,6 +4,10 @@ use smash::app::lua_bind::WorkModule;
 use smash::app::BattleObjectModuleAccessor;
 use smash::lib::lua_const::*;
 
+/// Combattant hôte du mod. "ness" en production ; "mario" pour tester sur une sauvegarde
+/// où Ness n'est pas encore débloqué.
+pub const HOST: &str = "ness";
+
 pub const MAX_SKULLS: i32 = 3;
 /// Un crâne tous les X % de dégâts infligés par les attaques normales.
 pub const DMG_PER_SKULL: f32 = 30.0;
@@ -25,6 +29,7 @@ pub struct MumboState {
     pub pad_x: f32,
     pub pad_y: f32,
     pub slowed_mask: u32,
+    pub last_status: i32,
 }
 
 const INIT: MumboState = MumboState {
@@ -40,6 +45,7 @@ const INIT: MumboState = MumboState {
     pad_x: 0.0,
     pad_y: 0.0,
     slowed_mask: 0,
+    last_status: -1,
 };
 
 static mut STATES: [MumboState; 8] = [INIT; 8];
@@ -56,5 +62,6 @@ pub unsafe fn reset(boma: *mut BattleObjectModuleAccessor) {
 pub fn gain_skull(s: &mut MumboState) {
     if s.skulls < MAX_SKULLS {
         s.skulls += 1;
+        println!("[mumbo_mod] crâne gagné -> {}", s.skulls);
     }
 }

@@ -143,6 +143,7 @@ unsafe extern "C" fn special_n_main(fighter: &mut L2CFighterCommon) -> L2CValue 
     s.timer = 0;
     s.zap_lvl = 0;
     s.fire_frame = -1;
+    println!("[mumbo_mod] B neutre : Zap commence (crânes={})", s.skulls);
     apply_situation(fighter, true);
     set_motion(fighter, "special_n_start", "special_air_n_start");
     shift_main(fighter, special_n_loop)
@@ -169,6 +170,7 @@ unsafe extern "C" fn special_n_loop(fighter: &mut L2CFighterCommon) -> L2CValue 
         if (!held && s.timer >= 6) || s.timer >= 42 {
             s.fire_frame = s.timer;
             let l = s.zap_lvl as usize;
+            println!("[mumbo_mod] Zap tiré : palier {} à la frame {}", l, s.timer);
             hit(fighter, 0, ZAP_DMG[l], 361, ZAP_KBG[l], 0, ZAP_BKB[l], ZAP_SIZE[l], 8.0, 8.0,
                 Some(8.0 + ZAP_LEN[l]), 0, "collision_attr_elec");
             purple_flash(fighter, "sys_hit_elec", 0.6 + 0.4 * s.zap_lvl as f32);
@@ -198,6 +200,7 @@ unsafe extern "C" fn special_s_main(fighter: &mut L2CFighterCommon) -> L2CValue 
     if s.croco {
         s.skulls -= 1;
     }
+    println!("[mumbo_mod] B côté : {} (crânes restants={})", if s.croco { "Croco" } else { "Termite" }, s.skulls);
     apply_situation(fighter, true);
     set_motion(fighter, "special_s", "special_air_s");
     shift_main(fighter, special_s_loop)
@@ -256,6 +259,7 @@ unsafe extern "C" fn special_hi_pre(fighter: &mut L2CFighterCommon) -> L2CValue 
 unsafe extern "C" fn special_hi_main(fighter: &mut L2CFighterCommon) -> L2CValue {
     let boma = fighter.module_accessor;
     st(boma).timer = 0;
+    println!("[mumbo_mod] B haut : lévitation commence");
     GroundModule::correct(boma, GroundCorrectKind(*GROUND_CORRECT_KIND_AIR));
     set_motion(fighter, "special_air_hi_hold", "special_air_hi_hold");
     shift_main(fighter, special_hi_loop)
@@ -338,6 +342,7 @@ unsafe extern "C" fn special_lw_loop(fighter: &mut L2CFighterCommon) -> L2CValue
         };
         s.pad_effect = effect;
         s.skulls -= cost;
+        println!("[mumbo_mod] B bas : socle effet {} (crânes restants={})", effect, s.skulls);
         s.slowed_mask = 0;
         s.pad_x = PostureModule::pos_x(boma) + 12.0 * PostureModule::lr(boma);
         s.pad_y = PostureModule::pos_y(boma);
@@ -370,7 +375,7 @@ const SILENCED: [&str; 7] = [
 ];
 
 pub fn install() {
-    let mut ag = Agent::new("ness");
+    let mut ag = Agent::new(HOST);
     for name in SILENCED {
         for prefix in ["game_", "effect_", "sound_", "expression_"] {
             // Les noms doivent vivre toute la durée du jeu : on les « fuit » volontairement.

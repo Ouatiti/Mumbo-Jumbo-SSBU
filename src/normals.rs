@@ -138,7 +138,7 @@ unsafe extern "C" fn game_attackairlw(a: &mut L2CAgentBase) {
 }
 
 pub fn install() {
-    let mut ag = Agent::new("ness");
+    let mut ag = Agent::new(crate::state::HOST);
     let table: [(&str, unsafe extern "C" fn(&mut L2CAgentBase)); 13] = [
         ("game_attack11", game_attack11), ("game_attack12", game_attack12), ("game_attack13", game_attack13),
         ("game_attacks3", game_attacks3), ("game_attackhi3", game_attackhi3), ("game_attacklw3", game_attacklw3),

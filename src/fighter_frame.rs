@@ -36,6 +36,18 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
         return;
     }
     let s = st(boma);
+    s.timer += 0; // (le timer des spéciaux est géré dans specials.rs)
+    static mut BEAT: u32 = 0;
+    BEAT += 1;
+    if BEAT % 300 == 1 {
+        println!("[mumbo_mod] frame hook actif (statut={}, battement={})", status, BEAT);
+    }
+
+    // Trace de diagnostic : chaque changement de statut (hors marche/attente/chute, trop bavards).
+    if status != s.last_status {
+        s.last_status = status;
+        println!("[mumbo_mod] statut -> {} (crânes={})", status, s.skulls);
+    }
 
     // Gain par les coups normaux : on compte une fois par contact (front montant).
     let inflicting = AttackModule::is_infliction(boma, *COLLISION_KIND_MASK_HIT);
@@ -68,6 +80,10 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
     }
 }
 
+unsafe extern "C" fn diag_start(_fighter: &mut L2CFighterCommon) {
+    println!("[mumbo_mod] on_start déclenché");
+}
+
 pub fn install() {
-    Agent::new("ness").on_line(Main, mumbo_frame).install();
+    Agent::new(HOST).on_start(diag_start).on_line(Main, mumbo_frame).install();
 }

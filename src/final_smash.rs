@@ -47,7 +47,7 @@ unsafe extern "C" fn game_finalattack(a: &mut L2CAgentBase) {
 }
 
 pub fn install() {
-    Agent::new("ness")
+    Agent::new(crate::state::HOST)
         .acmd("game_finalstart", game_finalstart, Priority::Low)
         .acmd("game_finalairstart", game_finalstart, Priority::Low)
         .acmd("game_finalattack", game_finalattack, Priority::Low)

@@ -1,0 +1,1 @@
+﻿Patch smashline 2.0.0 pour Ryujinx : interpreter.rs::get_scripts renvoie vide (le montage 'mods:' n'existe pas sous Ryujinx -> abort FsNotMounted) ; cloning, params, effects, runtime_reload desactives dans lib.rs.
