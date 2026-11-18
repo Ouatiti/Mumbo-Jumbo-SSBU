@@ -4,6 +4,7 @@ use smash::app::lua_bind::*;
 use smash::lib::lua_const::*;
 use smash::lua2cpp::L2CFighterCommon;
 use smash::phx::Hash40;
+use smash::app::Fighter;
 use smash_script::*;
 use smashline::*;
 
@@ -46,7 +47,9 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
     // Trace de diagnostic : chaque changement de statut (hors marche/attente/chute, trop bavards).
     if status != s.last_status {
         s.last_status = status;
-        println!("[mumbo_mod] statut -> {} (crânes={})", status, s.skulls);
+        println!("[mumbo_mod] statut -> {} (crânes={}) smash={} s3={}", status, s.skulls,
+            status == *FIGHTER_STATUS_KIND_ATTACK_S4 || status == *FIGHTER_STATUS_KIND_ATTACK_HI4 || status == *FIGHTER_STATUS_KIND_ATTACK_LW4,
+            status == *FIGHTER_STATUS_KIND_ATTACK_S3);
     }
 
     // Gain par les coups normaux : on compte une fois par contact (front montant).
@@ -65,6 +68,31 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
         return;
     }
 
+    // Final Smash : capture des adversaires proches, attirés devant Mumbo pendant les éclairs.
+    static mut FS_FRAME: i32 = 0;
+    if status == *FIGHTER_STATUS_KIND_FINAL {
+        FS_FRAME += 1;
+        if FS_FRAME >= 20 && FS_FRAME <= 120 {
+            let my_x = PostureModule::pos_x(boma);
+            let my_y = PostureModule::pos_y(boma);
+            let lr = PostureModule::lr(boma);
+            let my_id = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+            for i in 0..Fighter::get_fighter_entry_count().min(8) {
+                if i == my_id { continue; }
+                let oid = Fighter::get_id_from_entry_id(i);
+                let ob = smash::app::sv_battle_object::module_accessor(oid);
+                if ob.is_null() { continue; }
+                let dx = PostureModule::pos_x(ob) - my_x;
+                let dy = PostureModule::pos_y(ob) - my_y;
+                if dx.abs() < 70.0 && dy.abs() < 50.0 {
+                    let pos = smash::phx::Vector3f { x: my_x + 20.0 * lr, y: my_y + 6.0, z: 0.0 };
+                    PostureModule::set_pos(ob, &pos);
+                }
+            }
+        }
+    } else {
+        FS_FRAME = 0;
+    }
     // Gain passif (le « timer » de la spec).
     s.passive_timer += 1;
     if s.passive_timer >= PASSIVE_FRAMES {
