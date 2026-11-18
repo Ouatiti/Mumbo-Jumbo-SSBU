@@ -74,6 +74,25 @@ function Combo([byte]$dir, [byte]$btn, [int]$ms = 200) {
   Start-Sleep -Milliseconds 120
 }
 
+# Capture du framebuffer du jeu via le raccourci F8 de Ryujinx (image complète), réduite de moitié.
+function GShot([string]$path, [int]$div = 2) {
+  $dir = "$env:APPDATA\Ryujinx\screenshots"
+  $t0 = Get-Date
+  Key 0x77 80
+  for ($i = 0; $i -lt 20; $i++) {
+    Start-Sleep -Milliseconds 250
+    $f = Get-ChildItem $dir -Filter *.png | Where-Object { $_.LastWriteTime -ge $t0.AddSeconds(-1) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($f) { break }
+  }
+  if (-not $f) { "pas de capture"; return }
+  Start-Sleep -Milliseconds 300
+  $img = [System.Drawing.Image]::FromFile($f.FullName)
+  $small = New-Object System.Drawing.Bitmap $img, ([int]($img.Width/$div)), ([int]($img.Height/$div))
+  $small.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $img.Dispose(); $small.Dispose()
+  Remove-Item $f.FullName -ErrorAction SilentlyContinue
+  "ok $path"
+}
+
 function ShotFull([string]$path) {
   $p = Get-Ryu; if (-not $p) { "pas de fenetre"; return }
   Focus-Ryu $p; Start-Sleep -Milliseconds 700

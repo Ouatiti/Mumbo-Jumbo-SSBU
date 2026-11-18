@@ -4,7 +4,6 @@ use smash::app::lua_bind::*;
 use smash::lib::lua_const::*;
 use smash::lua2cpp::L2CFighterCommon;
 use smash::phx::Hash40;
-use smash::app::Fighter;
 use smash_script::*;
 use smashline::*;
 
@@ -68,31 +67,18 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
         return;
     }
 
-    // Final Smash : capture des adversaires proches, attirés devant Mumbo pendant les éclairs.
-    static mut FS_FRAME: i32 = 0;
-    if status == *FIGHTER_STATUS_KIND_FINAL {
-        FS_FRAME += 1;
-        if FS_FRAME >= 20 && FS_FRAME <= 120 {
-            let my_x = PostureModule::pos_x(boma);
-            let my_y = PostureModule::pos_y(boma);
-            let lr = PostureModule::lr(boma);
-            let my_id = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
-            for i in 0..Fighter::get_fighter_entry_count().min(8) {
-                if i == my_id { continue; }
-                let oid = Fighter::get_id_from_entry_id(i);
-                let ob = smash::app::sv_battle_object::module_accessor(oid);
-                if ob.is_null() { continue; }
-                let dx = PostureModule::pos_x(ob) - my_x;
-                let dy = PostureModule::pos_y(ob) - my_y;
-                if dx.abs() < 70.0 && dy.abs() < 50.0 {
-                    let pos = smash::phx::Vector3f { x: my_x + 20.0 * lr, y: my_y + 6.0, z: 0.0 };
-                    PostureModule::set_pos(ob, &pos);
-                }
-            }
-        }
-    } else {
-        FS_FRAME = 0;
+    #[cfg(feature = "fs_test")]
+    if status == *FIGHTER_STATUS_KIND_APPEAL
+        && [smash::hash40("appeal_s_r"), smash::hash40("appeal_s_l")].contains(&MotionModule::motion_kind(boma))
+    {
+        WorkModule::on_flag(boma, *FIGHTER_INSTANCE_WORK_ID_FLAG_FINAL);
+        StatusModule::change_status_request_from_script(boma, *FIGHTER_STATUS_KIND_FINAL, true);
     }
+
+    // Final Smash « Golden Goliath » (statue géante dorée) : piloté frame par frame.
+    let in_fs = crate::final_smash::is_fs_status(status);
+    crate::final_smash::goliath_frame(fighter, s, in_fs);
+
     // Gain passif (le « timer » de la spec).
     s.passive_timer += 1;
     if s.passive_timer >= PASSIVE_FRAMES {
@@ -100,11 +86,42 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
         gain_skull(s);
     }
 
-    // Indicateur : étincelle violette sur le bâton, plus grosse avec le nombre de crânes.
-    if s.skulls > 0 && s.passive_timer % 20 == 0 {
-        let size = 0.15 + 0.12 * s.skulls as f32;
-        macros::EFFECT_FOLLOW(fighter, Hash40::new("sys_hit_magic"), Hash40::new("haver"), 0, 0, 0, 0, 0, 0, size, true);
-        macros::LAST_EFFECT_SET_COLOR(fighter, 0.6, 0.2, 1.0);
+    orbit_skulls(fighter, s, !in_fs);
+}
+
+// ───────────── Crânes en orbite (jauge visuelle, façon orbes de Rosalina) ─────────────
+// Un petit globe os/ivoire par crâne, en cercle horizontal autour du torse ; espacement
+// régulier (2π/n), rotation continue + léger flottement vertical. Les effets sont recréés
+// toutes les 2 frames à la nouvelle position (l'ancien est tué : pas d'accumulation).
+const ORBIT_R: f32 = 7.0;
+const ORBIT_Y: f32 = 9.0;
+const ORBIT_SPEED: f32 = 2.6; // rad/s
+
+unsafe fn orbit_skulls(fighter: &mut L2CFighterCommon, s: &mut MumboState, visible: bool) {
+    if s.passive_timer % 2 != 0 { return; }
+    let boma = fighter.module_accessor;
+    for h in s.orbit.iter_mut() {
+        if *h != 0 {
+            EffectModule::kill(boma, *h as u32, false, false);
+            *h = 0;
+        }
+    }
+    let n = s.skulls.clamp(0, MAX_SKULLS) as usize;
+    if !visible || n == 0 { return; }
+    let t = s.passive_timer as f32 / 60.0;
+    for k in 0..n {
+        let th = t * ORBIT_SPEED + k as f32 * core::f32::consts::TAU / n as f32;
+        let x = ORBIT_R * th.sin();
+        let z = ORBIT_R * th.cos();
+        let y = ORBIT_Y + 0.8 * (t * 3.0 + k as f32 * 2.0).sin();
+        macros::EFFECT_FOLLOW(fighter, Hash40::new("sys_aura_light"), Hash40::new("top"), x, y, z, 0, 0, 0, 0.13, true);
+        macros::LAST_EFFECT_SET_COLOR(fighter, 1.0, 0.93, 0.78);
+        s.orbit[k] = EffectModule::get_last_handle(boma);
+        // étincelle violette (rendu non additif : reste visible même sur fond clair)
+        if s.passive_timer % 6 == 0 {
+            macros::EFFECT_FOLLOW(fighter, Hash40::new("sys_hit_magic"), Hash40::new("top"), x, y, z, 0, 0, 0, 0.05, true);
+            macros::LAST_EFFECT_SET_COLOR(fighter, 0.6, 0.2, 1.0);
+        }
     }
 }
 

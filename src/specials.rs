@@ -165,7 +165,7 @@ unsafe extern "C" fn special_n_loop(fighter: &mut L2CFighterCommon) -> L2CValue 
         let held = ControlModule::check_button_on(boma, *CONTROL_PAD_BUTTON_SPECIAL);
         if held && s.timer % 14 == 0 && s.zap_lvl < 2 {
             s.zap_lvl += 1;
-            purple_flash(fighter, "sys_hit_magic", 0.4 + 0.3 * s.zap_lvl as f32);
+            purple_flash(fighter, "sys_hit_magic", 0.2 + 0.12 * s.zap_lvl as f32);
         }
         if (!held && s.timer >= 6) || s.timer >= 42 {
             s.fire_frame = s.timer;
@@ -238,7 +238,7 @@ unsafe extern "C" fn special_s_loop(fighter: &mut L2CFighterCommon) -> L2CValue 
         }
         if t == 12 {
             hit(fighter, 0, 16.0, 40, 95, 0, 45, 7.0, 7.0, 10.0, None, 0, "collision_attr_cutup");
-            purple_flash(fighter, "sys_hit_magic", 0.8);
+            purple_flash(fighter, "sys_hit_magic", 0.35);
         }
         if t == 16 {
             AttackModule::clear_all(boma);
@@ -351,7 +351,7 @@ unsafe extern "C" fn special_lw_loop(fighter: &mut L2CFighterCommon) -> L2CValue
             2 => hit(fighter, 0, 6.0, 361, 50, 0, 30, 10.0, 3.0, 12.0, None, 0, "collision_attr_bury"),
             _ => {}
         }
-        purple_flash(fighter, "sys_hit_magic", 0.6 + 0.3 * effect as f32);
+        purple_flash(fighter, "sys_hit_magic", 0.25 + 0.12 * effect as f32);
     }
     if (10..40).contains(&t) && s.pad_effect == 0 {
         slow_victims(fighter);

@@ -8,6 +8,8 @@ mod fighter_frame;
 mod specials;
 mod normals;
 mod final_smash;
+mod movement;
+mod appeals;
 
 #[skyline::main(name = "mumbo_mod")]
 pub fn main() {
@@ -16,4 +18,6 @@ pub fn main() {
     specials::install();
     normals::install();
     final_smash::install();
+    movement::install();
+    appeals::install();
 }

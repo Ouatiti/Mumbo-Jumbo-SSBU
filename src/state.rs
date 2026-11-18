@@ -30,6 +30,11 @@ pub struct MumboState {
     pub pad_y: f32,
     pub slowed_mask: u32,
     pub last_status: i32,
+    /// Handles des effets « crânes en orbite » (0 = aucun).
+    pub orbit: [u64; 3],
+    /// Final Smash Golden Goliath : frame écoulée (0 = inactif) et position x de la statue.
+    pub fs_frame: i32,
+    pub fs_x: f32,
 }
 
 const INIT: MumboState = MumboState {
@@ -46,6 +51,9 @@ const INIT: MumboState = MumboState {
     pad_y: 0.0,
     slowed_mask: 0,
     last_status: -1,
+    orbit: [0; 3],
+    fs_frame: 0,
+    fs_x: 0.0,
 };
 
 static mut STATES: [MumboState; 8] = [INIT; 8];
