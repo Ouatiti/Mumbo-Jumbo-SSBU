@@ -53,12 +53,17 @@ def pix(im):
 skull_mat = bpy.data.objects['Mumbo_token_crane'].data.materials[0]
 eye_mat = bpy.data.objects['Eye_L'].data.materials[0]
 col = np.ones((TEX, 2 * TEX, 4), dtype=np.float32)
-col[:, :TEX] = pix(tex_of(skull_mat, 'Base Color'))
+skull = pix(tex_of(skull_mat, 'Base Color'))
+# Chrome : couleur desaturee et eclaircie (en metal, l'albedo teinte les reflets ; le beige donnait du dore).
+lum = (skull[..., :3] @ np.array([0.30, 0.59, 0.11], dtype=np.float32))[..., None]
+skull[..., :3] = np.clip((lum + 0.15 * (skull[..., :3] - lum)) * 1.25 + 0.08, 0.0, 1.0)
+col[:, :TEX] = skull
 col[:, TEX:] = pix(tex_of(eye_mat, 'Base Color'))
 col[..., 3] = 1.0
 orm = pix(tex_of(skull_mat, 'Roughness'))       # glTF ORM : R=occlusion, G=rugosite, B=metal
 prm = np.empty_like(col)                         # SSBU prm : R=metal, G=rugosite, B=AO, A=speculaire
-prm[:, :TEX] = np.stack([orm[..., 2], orm[..., 1], orm[..., 0], np.full_like(orm[..., 0], 0.5)], -1)
+one = np.ones_like(orm[..., 0])
+prm[:, :TEX] = np.stack([one, np.clip(orm[..., 1] * 0.35, 0.06, 0.3), orm[..., 0], one], -1)
 prm[:, TEX:] = (0.0, 0.1, 1.0, 0.6)
 
 
