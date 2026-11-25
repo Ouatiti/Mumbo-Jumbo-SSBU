@@ -91,6 +91,13 @@ for t in mat.sub_matl_data.textures:
 
 # ---------- Pieces du token : pose de repos figee en espace monde ----------
 dg = bpy.context.evaluated_depsgraph_get()
+# Pivots d'animation (espace monde du glb) : charniere de la machoire et centre des yeux.
+ga = next(o for o in imported if o.type == 'ARMATURE')
+PIVOT = {'root': None,
+         'jaw': ga.matrix_world @ ga.pose.bones['Jaw'].head,
+         'eyea': ga.matrix_world @ ga.pose.bones['Bone_Eye_L'].head,
+         'eyeb': ga.matrix_world @ ga.pose.bones['Bone_Eye_R'].head}
+GROUP = {'Mumbo_token_crane': 'root', 'Mumbo_token_mandibule': 'jaw', 'Eye_L': 'eyea', 'Eye_R': 'eyeb'}
 parts = []
 for name, ratio in DECIM.items():
     src = bpy.data.objects[name]
@@ -113,6 +120,7 @@ for name, ratio in DECIM.items():
     while len(o.data.uv_layers) > 1:
         o.data.uv_layers.remove(o.data.uv_layers[1])
     o.data.materials.clear(); o.data.materials.append(mat)
+    o.vertex_groups.new(name=GROUP[name]).add(list(range(len(o.data.vertices))), 1.0, 'REPLACE')
     parts.append(o)
 
 for o in imported:
@@ -130,36 +138,63 @@ co = np.array([v.co[:] for v in me.vertices])
 lo, hi = co.min(0), co.max(0)
 c = Vector((lo + hi) / 2)
 k = SIZE / (hi[2] - lo[2])
-me.transform(Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Scale(k, 4) @ Matrix.Translation(-c))
-print("TOKEN faces", len(me.polygons), "verts", len(me.vertices))
+MTOK = Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Scale(k, 4) @ Matrix.Translation(-c)
+me.transform(MTOK)
+PIVOT = {g: (MTOK @ p if p is not None else Vector((0, 0, 0))) for g, p in PIVOT.items()}
+print("TOKEN faces", len(me.polygons), "verts", len(me.vertices), "pivots", {g: p.to_tuple(2) for g, p in PIVOT.items()})
 
 for ca in list(me.color_attributes):
     me.color_attributes.remove(ca)
 ca = me.color_attributes.new('colorSet1', 'BYTE_COLOR', 'CORNER')
 ca.data.foreach_set('color', [0.5, 0.5, 0.5, 0.5] * len(ca.data))
 
-# ---------- Copies autour du personnage, skinnees sur Throw ----------
+# ---------- Copies autour du personnage, skinnees sur leurs propres os ----------
 # Un jeu de meshes par niveau de jauge (1, 2 ou 3 tokens regulierement espaces) :
 # le code n'affiche que le jeu mumbo_tok{n}_* correspondant au nombre de cranes.
+# Chaque token a 4 os (racine au centre, machoire, deux yeux), enfants de 'Throw' qui porte l'orbite.
+# Prefixe H_ : l'exporteur les place en fin de squelette, sans decaler les os vanilla de Ness.
+# Orientation = celle de Throw tournee comme le token : dans le repere local de chaque os,
+# Y est vertical, +Z pointe vers l'avant du token et X est lateral, pour tous les tokens.
+bpy.context.view_layer.objects.active = arm
+bpy.ops.object.select_all(action='DESELECT'); arm.select_set(True)
+bpy.ops.object.mode_set(mode='EDIT')
+ebs = arm.data.edit_bones
+for eb in [b for b in ebs if b.name.startswith('H_tok')]:
+    ebs.remove(eb)
+throw_eb = ebs['Throw']
+throw_rot = throw_eb.matrix.to_3x3().to_4x4()
+placements = []
+for n in range(1, N + 1):
+    for i in range(n):
+        th = i * 2 * math.pi / n
+        M = Matrix.Translation((R * math.sin(th), -R * math.cos(th), H)) @ Matrix.Rotation(-th, 4, 'Z')
+        tag = f"{n}_{i + 1}"
+        bones = {}
+        for g in ('root', 'jaw', 'eyea', 'eyeb'):
+            eb = ebs.new(f"H_tok{tag}_{g}")
+            eb.length = 0.3
+            eb.matrix = Matrix.Translation(M @ PIVOT[g]) @ Matrix.Rotation(-th, 4, 'Z') @ throw_rot
+            eb.parent = throw_eb if g == 'root' else bones['root']
+            eb.use_connect = False
+            eb.use_deform = True
+            bones[g] = eb
+        placements.append((n, i, M, tag))
+bpy.ops.object.mode_set(mode='OBJECT')
+
 base = tok.data.copy()
 first = True
-for n in range(1, N + 1):
-  for i in range(n):
-    th = i * 2 * math.pi / n
+for n, i, M, tag in placements:
     o = tok if first else tok.copy()
     if not first:
         o.data = base.copy()
         bpy.context.scene.collection.objects.link(o)
     first = False
-    o.name = o.data.name = f"mumbo_tok{n}_{i + 1}"
+    o.name = o.data.name = f"mumbo_tok{tag}"
     # face (-Y) tournee vers l'exterieur
-    M = Matrix.Translation((R * math.sin(th), -R * math.cos(th), H)) @ Matrix.Rotation(-th, 4, 'Z')
     o.data.transform(M)
     o.matrix_world = Matrix.Identity(4)
-    for vg in list(o.vertex_groups):
-        o.vertex_groups.remove(vg)
-    g = o.vertex_groups.new(name='Throw')
-    g.add(list(range(len(o.data.vertices))), 1.0, 'REPLACE')
+    for vg in o.vertex_groups:
+        vg.name = f"H_tok{tag}_{vg.name}"
     for md in list(o.modifiers):
         o.modifiers.remove(md)
     md = o.modifiers.new('Armature', 'ARMATURE'); md.object = arm
