@@ -141,6 +141,20 @@ fn small_rotation(x: f32, y: f32, z: f32) -> M3 {
      [w * u * t - v * s, w * v * t + u * s, c + w * w * t]]
 }
 
+// Les tokens sont petits à l'écran : on exagère la mâchoire et les yeux du blend.
+const JAW_GAIN: f32 = 2.5;
+const EYE_GAIN: f32 = 1.3; // le blend va déjà jusqu'à 57°
+/// Multiplie l'angle d'une rotation (Euler XYZ en degrés) en gardant son axe.
+fn amplify(x: f32, y: f32, z: f32, gain: f32) -> [f32; 3] {
+    let m = from_euler_xyz(x, y, z);
+    let c = ((m[0][0] + m[1][1] + m[2][2] - 1.0) * 0.5).clamp(-1.0, 1.0);
+    let a = c.acos();
+    let s = a.sin();
+    if s.abs() < 1e-5 { return [x * gain, y * gain, z * gain]; }
+    let k = a * gain / (2.0 * s);
+    to_euler_xyz(&small_rotation((m[2][1] - m[1][2]) * k, (m[0][2] - m[2][0]) * k, (m[1][0] - m[0][1]) * k))
+}
+
 const TOKEN_MESHES: [[&str; 3]; 3] = [
     ["mumbo_tok1_1", "", ""],
     ["mumbo_tok2_1", "mumbo_tok2_2", ""],
@@ -190,9 +204,12 @@ pub unsafe fn orbit_skulls(fighter: &mut L2CFighterCommon, s: &mut MumboState, v
         let b = &ANIM[(i + k * 137) % ANIM_FRAMES];
         let tag = format!("tok{}_{}", n, k + 1);
         rotate_bone(boma, &format!("{tag}_root"), b[3], b[4], b[5]);
-        rotate_bone(boma, &format!("{tag}_jaw"), b[6], b[7], b[8]);
-        rotate_bone(boma, &format!("{tag}_eyea"), b[9], b[10], b[11]);
-        rotate_bone(boma, &format!("{tag}_eyeb"), b[12], b[13], b[14]);
+        let [jx, jy, jz] = amplify(b[6], b[7], b[8], JAW_GAIN);
+        rotate_bone(boma, &format!("{tag}_jaw"), jx, jy, jz);
+        let [ax, ay, az] = amplify(b[9], b[10], b[11], EYE_GAIN);
+        rotate_bone(boma, &format!("{tag}_eyea"), ax, ay, az);
+        let [bx, by, bz] = amplify(b[12], b[13], b[14], EYE_GAIN);
+        rotate_bone(boma, &format!("{tag}_eyeb"), bx, by, bz);
     }
 }
 
