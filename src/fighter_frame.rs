@@ -95,27 +95,8 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
 // par niveau de jauge : mumbo_tok{n}_{k}, n tokens régulièrement espacés. On n'affiche que le jeu
 // correspondant au nombre de crânes.
 // Os : « throw » (inutilisé par Mumbo hors projections) porte l'orbite ; chaque token a ses os
-// h_tok{n}_{k}_root / _jaw / _eyea / _eyeb (repère local : Y vertical, Z vers l'avant du token).
-const ORBIT_SPEED_DEG: f32 = 150.0; // °/s
-const TAU: f32 = core::f32::consts::TAU;
-
-fn smooth(x: f32) -> f32 {
-    let x = x.clamp(0.0, 1.0);
-    x * x * (3.0 - 2.0 * x)
-}
-
-/// Regard en boucle : gauche, haut, droite, haut, gauche… -> (tangage, lacet) en degrés.
-fn gaze(t: f32) -> (f32, f32) {
-    const KEYS: [(f32, f32); 4] = [(0.0, -28.0), (-24.0, 0.0), (0.0, 28.0), (-24.0, 0.0)];
-    const SEG: f32 = 0.75; // s par regard (pause puis transition)
-    const HOLD: f32 = 0.35;
-    let u = (t / SEG).rem_euclid(4.0);
-    let i = u as usize % 4;
-    let a = KEYS[i];
-    let b = KEYS[(i + 1) % 4];
-    let f = smooth((u.fract() * SEG - HOLD) / (SEG - HOLD));
-    (a.0 + (b.0 - a.0) * f, a.1 + (b.1 - a.1) * f)
-}
+// tok{n}_{k}_root / _jaw / _eyea / _eyeb (pas de préfixe H_ : le jeu ignore set_joint_rotate dessus).
+use crate::token_anim::{ANIM, FRAMES as ANIM_FRAMES};
 
 unsafe fn rotate_bone(boma: *mut smash::app::BattleObjectModuleAccessor, name: &str, x: f32, y: f32, z: f32) {
     ModelModule::set_joint_rotate(boma, Hash40::new(name), &smash::phx::Vector3f { x, y, z },
@@ -144,23 +125,19 @@ pub unsafe fn orbit_skulls(fighter: &mut L2CFighterCommon, s: &mut MumboState, v
         }
     }
     if !show { return; }
-    let t = (s.orbit_t % (60 * 3600)) as f32 / 60.0;
+    // Animation du token (01_Modeles_3D/work/Mumbo token_ssbu.blend), boucle de 6 s précalculée.
+    let i = (s.orbit_t as usize) % ANIM_FRAMES;
     s.orbit_t = s.orbit_t.wrapping_add(1);
-    // Orbite + plan d'orbite qui ondule : chaque token monte et descend à son rythme (lévitation).
-    rotate_bone(boma, "throw", 4.0 * (t * 1.1).sin(), (t * ORBIT_SPEED_DEG) % 360.0, 3.0 * (t * 0.8 + 1.0).sin());
+    let a = &ANIM[i];
+    rotate_bone(boma, "throw", a[0], a[1], a[2]);
     for k in 0..n {
-        let p = k as f32 * 2.1; // déphasage entre tokens
-        let tag = format!("h_tok{}_{}", n, k + 1);
-        // Léger balancement du token sur lui-même.
-        rotate_bone(boma, &format!("{tag}_root"),
-            5.0 * (t * 1.9 + p).sin(), 7.0 * (t * 1.2 + p).sin(), 4.0 * (t * 1.4 + p).sin());
-        // Bouche : ouvre et ferme en continu.
-        let open = 0.5 - 0.5 * (t * TAU / 1.1 + p).cos();
-        rotate_bone(boma, &format!("{tag}_jaw"), 24.0 * open * open, 0.0, 0.0);
-        // Yeux : gauche, haut, droite, haut, gauche…
-        let (pitch, yaw) = gaze(t + k as f32 * 0.25);
-        rotate_bone(boma, &format!("{tag}_eyea"), pitch, yaw, 0.0);
-        rotate_bone(boma, &format!("{tag}_eyeb"), pitch, yaw, 0.0);
+        // Chaque token joue la même boucle, décalée pour ne pas bouger en même temps.
+        let b = &ANIM[(i + k * 137) % ANIM_FRAMES];
+        let tag = format!("tok{}_{}", n, k + 1);
+        rotate_bone(boma, &format!("{tag}_root"), b[3], b[4], b[5]);
+        rotate_bone(boma, &format!("{tag}_jaw"), b[6], b[7], b[8]);
+        rotate_bone(boma, &format!("{tag}_eyea"), b[9], b[10], b[11]);
+        rotate_bone(boma, &format!("{tag}_eyeb"), b[12], b[13], b[14]);
     }
 }
 

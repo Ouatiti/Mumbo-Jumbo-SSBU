@@ -5,6 +5,7 @@ macro_rules! println {
 }
 mod state;
 mod fighter_frame;
+mod token_anim;
 mod specials;
 mod normals;
 mod final_smash;

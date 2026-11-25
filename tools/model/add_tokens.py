@@ -152,14 +152,15 @@ ca.data.foreach_set('color', [0.5, 0.5, 0.5, 0.5] * len(ca.data))
 # Un jeu de meshes par niveau de jauge (1, 2 ou 3 tokens regulierement espaces) :
 # le code n'affiche que le jeu mumbo_tok{n}_* correspondant au nombre de cranes.
 # Chaque token a 4 os (racine au centre, machoire, deux yeux), enfants de 'Throw' qui porte l'orbite.
-# Prefixe H_ : l'exporteur les place en fin de squelette, sans decaler les os vanilla de Ness.
+# Pas de prefixe H_ : le jeu ignore set_joint_rotate sur les os « helper » H_ (verifie en jeu).
+# L'exporteur insere ces os juste apres leur parent (Throw) ; les animations referencent les os par nom.
 # Orientation = celle de Throw tournee comme le token : dans le repere local de chaque os,
 # Y est vertical, +Z pointe vers l'avant du token et X est lateral, pour tous les tokens.
 bpy.context.view_layer.objects.active = arm
 bpy.ops.object.select_all(action='DESELECT'); arm.select_set(True)
 bpy.ops.object.mode_set(mode='EDIT')
 ebs = arm.data.edit_bones
-for eb in [b for b in ebs if b.name.startswith('H_tok')]:
+for eb in [b for b in ebs if b.name.startswith(('H_tok', 'Tok'))]:
     ebs.remove(eb)
 throw_eb = ebs['Throw']
 throw_rot = throw_eb.matrix.to_3x3().to_4x4()
@@ -171,7 +172,7 @@ for n in range(1, N + 1):
         tag = f"{n}_{i + 1}"
         bones = {}
         for g in ('root', 'jaw', 'eyea', 'eyeb'):
-            eb = ebs.new(f"H_tok{tag}_{g}")
+            eb = ebs.new(f"Tok{tag}_{g}")
             eb.length = 0.3
             eb.matrix = Matrix.Translation(M @ PIVOT[g]) @ Matrix.Rotation(-th, 4, 'Z') @ throw_rot
             eb.parent = throw_eb if g == 'root' else bones['root']
@@ -194,7 +195,7 @@ for n, i, M, tag in placements:
     o.data.transform(M)
     o.matrix_world = Matrix.Identity(4)
     for vg in o.vertex_groups:
-        vg.name = f"H_tok{tag}_{vg.name}"
+        vg.name = f"Tok{tag}_{vg.name}"
     for md in list(o.modifiers):
         o.modifiers.remove(md)
     md = o.modifiers.new('Armature', 'ARMATURE'); md.object = arm
