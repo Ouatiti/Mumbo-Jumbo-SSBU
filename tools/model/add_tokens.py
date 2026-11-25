@@ -1,47 +1,80 @@
-"""Ajoute 3 Mumbo Tokens (jauge de cranes en orbite) au modele c00.
+"""Ajoute les Mumbo Tokens (jauge de cranes en orbite) au modele c00.
 
 blender -b mumbo_build/step2.blend -P tools/model/add_tokens.py
+Source : 01_Modeles_3D/Mumbo token_ssbu.glb (crane, mandibule, 2 yeux, textures PBR).
 Sortie : mumbo_build/out_tok (fichiers modele) + mumbo_build/step3.blend.
 Les tokens sont skinnes a 100% sur l'os 'Throw' (enfant de Rot, inutilise par Mumbo) ;
 le code Rust fait tourner cet os pour l'orbite et gere la visibilite mesh par mesh.
 """
 import bpy, math, os
 import numpy as np
+from mathutils import Matrix, Vector
 
 ROOT = r"E:\Project Mumbo\Emulateurs_Mumbo_Banjo"
-TOKEN_BLEND = r"E:\Project Mumbo\Modeles_3D_Mumbo\4_Mumbo_Token\crane_jeton.blend"
+TOKEN_GLB = r"E:\Project Mumbo\01_Modeles_3D\Mumbo token_ssbu.glb"
 VANILLA = r"E:\Emulateurs\ness_model\fighter\ness\model\body\c00" + "\\"
 EXP = ROOT + r"\mumbo_build\out_tok"
 os.makedirs(EXP, exist_ok=True)
 
 N, R, H, SIZE = 3, 7.0, 9.0, 2.6        # nombre, rayon, hauteur, taille du token
-DECIM = 0.008                            # le crane source fait 82k sommets
+TEX = 512                               # resolution d'une demi-planche
+# Le modele source est tres dense (Tripo) : on le decime fortement.
+DECIM = {'Mumbo_token_crane': 0.03, 'Mumbo_token_mandibule': 0.04, 'Eye_L': 0.012, 'Eye_R': 0.012}
 
 bpy.ops.preferences.addon_enable(module="smash-ultimate-blender")
 arm = bpy.data.objects['smush_blender_import']
+before = set(bpy.data.objects)
+bpy.ops.import_scene.gltf(filepath=TOKEN_GLB)
+imported = [o for o in bpy.data.objects if o not in before]
+bpy.context.scene.frame_set(0)
 
-# ---------- Texture couleur / prm (4 cases : chrome, ivoire, or, gemme) ----------
+
+def tex_of(mat, socket):
+    b = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    stack = [l.from_node for l in b.inputs[socket].links]
+    while stack:
+        n = stack.pop()
+        if n.type == 'TEX_IMAGE':
+            return n.image
+        stack += [l.from_node for i in n.inputs for l in i.links]
+
+
+def pix(im):
+    im = im.copy()
+    im.scale(TEX, TEX)
+    a = np.empty(TEX * TEX * 4, dtype=np.float32)
+    im.pixels.foreach_get(a)
+    bpy.data.images.remove(im)
+    return a.reshape(TEX, TEX, 4)
+
+
+# ---------- Planche de textures : crane a gauche, oeil a droite ----------
 # Noms de textures vanilla de Ness (non utilises par Mumbo) : pas d'ajout de fichier pour ARCropolis.
-CELLS = {'Chrome': 0, 'Ivoire': 1, 'Or': 2, 'Gemme_or': 3}
-COL = [(0.78, 0.80, 0.86), (0.93, 0.88, 0.74), (1.0, 0.72, 0.18), (1.0, 0.86, 0.32)]
-PRM = [(1.0, 0.22, 1.0, 0.6), (0.0, 0.55, 1.0, 0.5), (1.0, 0.30, 1.0, 0.6), (0.6, 0.15, 1.0, 0.8)]
-S = 64
+skull_mat = bpy.data.objects['Mumbo_token_crane'].data.materials[0]
+eye_mat = bpy.data.objects['Eye_L'].data.materials[0]
+col = np.ones((TEX, 2 * TEX, 4), dtype=np.float32)
+col[:, :TEX] = pix(tex_of(skull_mat, 'Base Color'))
+col[:, TEX:] = pix(tex_of(eye_mat, 'Base Color'))
+col[..., 3] = 1.0
+orm = pix(tex_of(skull_mat, 'Roughness'))       # glTF ORM : R=occlusion, G=rugosite, B=metal
+prm = np.empty_like(col)                         # SSBU prm : R=metal, G=rugosite, B=AO, A=speculaire
+prm[:, :TEX] = np.stack([orm[..., 2], orm[..., 1], orm[..., 0], np.full_like(orm[..., 0], 0.5)], -1)
+prm[:, TEX:] = (0.0, 0.1, 1.0, 0.6)
 
-def cell_img(name, vals, colorspace):
-    px = np.zeros((S, S, 4), dtype=np.float32)
-    for i, v in enumerate(vals):
-        cx, cy = i % 2, i // 2
-        px[cy * 32:(cy + 1) * 32, cx * 32:(cx + 1) * 32, :len(v)] = v
-        if len(v) == 3:
-            px[cy * 32:(cy + 1) * 32, cx * 32:(cx + 1) * 32, 3] = 1.0
-    im = bpy.data.images.new(name, S, S, alpha=True)
+
+def new_img(name, arr, colorspace):
+    old = bpy.data.images.get(name)
+    if old:
+        old.name = name + "_old"
+    im = bpy.data.images.new(name, arr.shape[1], arr.shape[0], alpha=True)
     im.colorspace_settings.name = colorspace
-    im.pixels.foreach_set(px.ravel())
+    im.pixels.foreach_set(arr.ravel())
     im.pack()
     return im
 
-col_img = cell_img("def_ness_002_col", [(c[0] ** 2.2, c[1] ** 2.2, c[2] ** 2.2) for c in COL], 'sRGB')
-prm_img = cell_img("def_ness_002_prm", PRM, 'Non-Color')
+
+col_img = new_img("def_ness_002_col", col, 'sRGB')
+prm_img = new_img("def_ness_002_prm", prm, 'Non-Color')
 
 mat = bpy.data.materials['mumbo_body'].copy()
 mat.name = 'mumbo_token'
@@ -51,53 +84,48 @@ for t in mat.sub_matl_data.textures:
     elif t.param_id_name == 'Texture6':
         t.image = prm_img
 
-def cell_uv(i):
-    # les pixels Blender partent du bas : la ligne 0 du tableau numpy = v proche de 0
-    return ((i % 2) * 0.5 + 0.25, (i // 2) * 0.5 + 0.25)
-
-# ---------- Import et preparation du token ----------
-with bpy.data.libraries.load(TOKEN_BLEND) as (src, dst):
-    dst.objects = [n for n in src.objects if n in ('Crane', 'Croc', 'Croc.001', 'Croc.002', 'Croc_or', 'Oeil_D', 'Oeil_G')]
+# ---------- Pieces du token : pose de repos figee en espace monde ----------
+dg = bpy.context.evaluated_depsgraph_get()
 parts = []
-for o in dst.objects:
+for name, ratio in DECIM.items():
+    src = bpy.data.objects[name]
+    me = bpy.data.meshes.new_from_object(src.evaluated_get(dg))
+    me.transform(src.matrix_world)
+    o = bpy.data.objects.new(name + "_tok", me)
     bpy.context.scene.collection.objects.link(o)
-    o.data = o.data.copy()
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.select_all(action='DESELECT'); o.select_set(True)
+    d = o.modifiers.new('dec', 'DECIMATE'); d.ratio = ratio
+    bpy.ops.object.modifier_apply(modifier='dec')
+    # UV vers la demi-planche correspondante
+    uv = o.data.uv_layers[0]
+    a = np.empty(len(uv.data) * 2, dtype=np.float32)
+    uv.data.foreach_get('uv', a)
+    a = a.reshape(-1, 2) % 1.0
+    a[:, 0] = a[:, 0] * 0.5 + (0.5 if name.startswith('Eye') else 0.0)
+    uv.data.foreach_set('uv', a.ravel())
+    uv.name = 'map1'
+    while len(o.data.uv_layers) > 1:
+        o.data.uv_layers.remove(o.data.uv_layers[1])
+    o.data.materials.clear(); o.data.materials.append(mat)
     parts.append(o)
 
-for o in parts:
-    ms = [s.material for s in o.material_slots if s.material] + [x for x in o.data.materials if x]
-    m = ms[0].name.split('.')[0] if ms else 'Chrome'
-    print("PART", o.name, m, len(o.data.vertices))
-    o['cell'] = CELLS.get(m, 0)
-    if o.name.startswith('Crane'):
-        bpy.context.view_layer.objects.active = o
-        d = o.modifiers.new('dec', 'DECIMATE'); d.ratio = DECIM
-        bpy.ops.object.select_all(action='DESELECT'); o.select_set(True)
-        bpy.ops.object.modifier_apply(modifier='dec')
-    # UV : chaque face pointe au centre de la case de son materiau
-    me = o.data
-    while me.uv_layers:
-        me.uv_layers.remove(me.uv_layers[0])
-    uv = me.uv_layers.new(name='map1')
-    u, v = cell_uv(o['cell'])
-    uv.data.foreach_set('uv', [u, v] * len(uv.data))
-    me.materials.clear(); me.materials.append(mat)
+for o in imported:
+    bpy.data.objects.remove(o, do_unlink=True)
 
 bpy.ops.object.select_all(action='DESELECT')
 for o in parts:
     o.select_set(True)
 bpy.context.view_layer.objects.active = parts[0]
-bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 bpy.ops.object.join()
 tok = bpy.context.view_layer.objects.active
 me = tok.data
-# Recentre et met a l'echelle
+# Recentre, met a l'echelle et tourne la face (+Y dans le glb) vers -Y
 co = np.array([v.co[:] for v in me.vertices])
 lo, hi = co.min(0), co.max(0)
-c = (lo + hi) / 2
+c = Vector((lo + hi) / 2)
 k = SIZE / (hi[2] - lo[2])
-for vtx in me.vertices:
-    vtx.co = (vtx.co - __import__('mathutils').Vector(c)) * k
+me.transform(Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Scale(k, 4) @ Matrix.Translation(-c))
 print("TOKEN faces", len(me.polygons), "verts", len(me.vertices))
 
 for ca in list(me.color_attributes):
@@ -105,10 +133,9 @@ for ca in list(me.color_attributes):
 ca = me.color_attributes.new('colorSet1', 'BYTE_COLOR', 'CORNER')
 ca.data.foreach_set('color', [0.5, 0.5, 0.5, 0.5] * len(ca.data))
 
-# ---------- 3 copies autour du personnage, skinnees sur Throw ----------
+# ---------- Copies autour du personnage, skinnees sur Throw ----------
 # Un jeu de meshes par niveau de jauge (1, 2 ou 3 tokens regulierement espaces) :
 # le code n'affiche que le jeu mumbo_tok{n}_* correspondant au nombre de cranes.
-from mathutils import Matrix
 base = tok.data.copy()
 first = True
 for n in range(1, N + 1):
