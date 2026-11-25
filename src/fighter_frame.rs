@@ -33,6 +33,7 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
         || status == *FIGHTER_STATUS_KIND_REBIRTH
     {
         reset(boma);
+        orbit_skulls(fighter, st(boma), false);
         return;
     }
     let s = st(boma);
@@ -89,40 +90,40 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
     orbit_skulls(fighter, s, !in_fs);
 }
 
-// ───────────── Crânes en orbite (jauge visuelle, façon orbes de Rosalina) ─────────────
-// Un petit globe os/ivoire par crâne, en cercle horizontal autour du torse ; espacement
-// régulier (2π/n), rotation continue + léger flottement vertical. Les effets sont recréés
-// toutes les 2 frames à la nouvelle position (l'ancien est tué : pas d'accumulation).
-const ORBIT_R: f32 = 7.0;
-const ORBIT_Y: f32 = 9.0;
-const ORBIT_SPEED: f32 = 2.6; // rad/s
+// ───────────── Mumbo Tokens en orbite (jauge visuelle) ─────────────
+// Les tokens sont de vrais meshes du modèle c00 (tools/model/add_tokens.py), skinnés sur l'os
+// « throw » (inutilisé par Mumbo hors projections). Un jeu de meshes par niveau de jauge :
+// mumbo_tok{n}_{k}, n tokens régulièrement espacés. On n'affiche que le jeu correspondant au
+// nombre de crânes et on fait tourner l'os autour de l'axe vertical, avec un léger flottement.
+const ORBIT_SPEED_DEG: f32 = 150.0; // °/s
+const TOKEN_MESHES: [[&str; 3]; 3] = [
+    ["mumbo_tok1_1", "", ""],
+    ["mumbo_tok2_1", "mumbo_tok2_2", ""],
+    ["mumbo_tok3_1", "mumbo_tok3_2", "mumbo_tok3_3"],
+];
 
-unsafe fn orbit_skulls(fighter: &mut L2CFighterCommon, s: &mut MumboState, visible: bool) {
-    if s.passive_timer % 2 != 0 { return; }
+unsafe fn is_throw_status(status: i32) -> bool {
+    (*FIGHTER_STATUS_KIND_CATCH..=*FIGHTER_STATUS_KIND_THROW).contains(&status)
+        || status == *FIGHTER_STATUS_KIND_THROW_KIRBY
+}
+
+pub unsafe fn orbit_skulls(fighter: &mut L2CFighterCommon, s: &mut MumboState, visible: bool) {
     let boma = fighter.module_accessor;
-    for h in s.orbit.iter_mut() {
-        if *h != 0 {
-            EffectModule::kill(boma, *h as u32, false, false);
-            *h = 0;
-        }
-    }
+    let status = StatusModule::status_kind(boma);
     let n = s.skulls.clamp(0, MAX_SKULLS) as usize;
-    if !visible || n == 0 { return; }
-    let t = s.passive_timer as f32 / 60.0;
-    for k in 0..n {
-        let th = t * ORBIT_SPEED + k as f32 * core::f32::consts::TAU / n as f32;
-        let x = ORBIT_R * th.sin();
-        let z = ORBIT_R * th.cos();
-        let y = ORBIT_Y + 0.8 * (t * 3.0 + k as f32 * 2.0).sin();
-        macros::EFFECT_FOLLOW(fighter, Hash40::new("sys_aura_light"), Hash40::new("top"), x, y, z, 0, 0, 0, 0.13, true);
-        macros::LAST_EFFECT_SET_COLOR(fighter, 1.0, 0.93, 0.78);
-        s.orbit[k] = EffectModule::get_last_handle(boma);
-        // étincelle violette (rendu non additif : reste visible même sur fond clair)
-        if s.passive_timer % 6 == 0 {
-            macros::EFFECT_FOLLOW(fighter, Hash40::new("sys_hit_magic"), Hash40::new("top"), x, y, z, 0, 0, 0, 0.05, true);
-            macros::LAST_EFFECT_SET_COLOR(fighter, 0.6, 0.2, 1.0);
+    let show = visible && n > 0 && !is_throw_status(status);
+    for (lvl, set) in TOKEN_MESHES.iter().enumerate() {
+        for name in set.iter().filter(|m| !m.is_empty()) {
+            ModelModule::set_mesh_visibility(boma, Hash40::new(name), show && lvl + 1 == n);
         }
     }
+    if !show { return; }
+    let t = s.orbit_t as f32 / 60.0;
+    s.orbit_t = s.orbit_t.wrapping_add(1);
+    let rot = smash::phx::Vector3f { x: 0.0, y: (t * ORBIT_SPEED_DEG) % 360.0, z: 0.0 };
+    ModelModule::set_joint_rotate(boma, Hash40::new("throw"), &rot,
+        smash::app::MotionNodeRotateCompose { _address: *MOTION_NODE_ROTATE_COMPOSE_AFTER as u8 },
+        smash::app::MotionNodeRotateOrder { _address: *MOTION_NODE_ROTATE_ORDER_XYZ as u8 });
 }
 
 unsafe extern "C" fn diag_start(_fighter: &mut L2CFighterCommon) {
