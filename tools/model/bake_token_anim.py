@@ -42,8 +42,10 @@ def sample(t):
     for key, name in (('jaw', 'Jaw'), ('eyea', 'Bone_Eye_L'), ('eyeb', 'Bone_Eye_R')):
         pb = arm.pose.bones[name]
         head = arm.pose.bones['Head'].matrix
-        d = rot3(head).inverted() @ rot3(pb.matrix) @ rot3(arm.data.bones[name].matrix_local).inverted() \
-            @ rot3(arm.data.bones['Head'].matrix_local)
+        # Rotation de l'os depuis son repos, moins celle de la tete, en espace armature :
+        # (tete·tete_repos⁻¹)⁻¹ · (os·os_repos⁻¹).
+        d = rot3(arm.data.bones['Head'].matrix_local) @ rot3(head).inverted() @ rot3(pb.matrix) \
+            @ rot3(arm.data.bones[name].matrix_local).inverted()
         bl[key] = A @ d @ A.inverted()
     return bl
 

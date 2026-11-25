@@ -95,7 +95,9 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
 // par niveau de jauge : mumbo_tok{n}_{k}, n tokens régulièrement espacés. On n'affiche que le jeu
 // correspondant au nombre de crânes.
 // Os : « throw » (inutilisé par Mumbo hors projections) porte l'orbite ; chaque token a ses os
-// tok{n}_{k}_root / _jaw / _eyea / _eyeb (pas de préfixe H_ : le jeu ignore set_joint_rotate dessus).
+// tok{n}_{k}_root / _jaw / _eyea / _eyeb. set_joint_rotate n'agit que sur les os ayant une piste
+// dans l'animation en cours : tools/model/add_token_tracks.py ajoute une piste fixe pour ces os à
+// toutes les motions (à relancer si les animations de tools/anim/out changent).
 use crate::token_anim::{ANIM, BOB, FRAMES as ANIM_FRAMES};
 const ORBIT_RADIUS: f32 = 7.0; // R de add_tokens.py
 
