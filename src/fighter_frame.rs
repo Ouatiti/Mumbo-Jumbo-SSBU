@@ -96,13 +96,49 @@ unsafe extern "C" fn mumbo_frame(fighter: &mut L2CFighterCommon) {
 // correspondant au nombre de crânes.
 // Os : « throw » (inutilisé par Mumbo hors projections) porte l'orbite ; chaque token a ses os
 // tok{n}_{k}_root / _jaw / _eyea / _eyeb (pas de préfixe H_ : le jeu ignore set_joint_rotate dessus).
-use crate::token_anim::{ANIM, FRAMES as ANIM_FRAMES};
+use crate::token_anim::{ANIM, BOB, FRAMES as ANIM_FRAMES};
+const ORBIT_RADIUS: f32 = 7.0; // R de add_tokens.py
 
 unsafe fn rotate_bone(boma: *mut smash::app::BattleObjectModuleAccessor, name: &str, x: f32, y: f32, z: f32) {
     ModelModule::set_joint_rotate(boma, Hash40::new(name), &smash::phx::Vector3f { x, y, z },
         smash::app::MotionNodeRotateCompose { _address: *MOTION_NODE_ROTATE_COMPOSE_AFTER as u8 },
         smash::app::MotionNodeRotateOrder { _address: *MOTION_NODE_ROTATE_ORDER_XYZ as u8 });
 }
+// Matrices 3x3 pour composer l'orbite et l'inclinaison. Convention Euler « XYZ » de Blender
+// (R = Rz·Ry·Rx), celle de bake_token_anim.py, que le jeu interprète correctement.
+type M3 = [[f32; 3]; 3];
+fn mat_mul(a: &M3, b: &M3) -> M3 {
+    let mut r = [[0.0; 3]; 3];
+    for i in 0..3 { for j in 0..3 { for k in 0..3 { r[i][j] += a[i][k] * b[k][j]; } } }
+    r
+}
+fn from_euler_xyz(x: f32, y: f32, z: f32) -> M3 {
+    let (sx, cx) = x.to_radians().sin_cos();
+    let (sy, cy) = y.to_radians().sin_cos();
+    let (sz, cz) = z.to_radians().sin_cos();
+    let rx = [[1.0, 0.0, 0.0], [0.0, cx, -sx], [0.0, sx, cx]];
+    let ry = [[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]];
+    let rz = [[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]];
+    mat_mul(&rz, &mat_mul(&ry, &rx))
+}
+fn to_euler_xyz(m: &M3) -> [f32; 3] {
+    let y = (-m[2][0]).clamp(-1.0, 1.0).asin();
+    let x = m[2][1].atan2(m[2][2]);
+    let z = m[1][0].atan2(m[0][0]);
+    [x.to_degrees(), y.to_degrees(), z.to_degrees()]
+}
+/// Rotation d'axe ω (radians, petit angle) par la formule de Rodrigues.
+fn small_rotation(x: f32, y: f32, z: f32) -> M3 {
+    let a = (x * x + y * y + z * z).sqrt();
+    if a < 1e-6 { return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]; }
+    let (u, v, w) = (x / a, y / a, z / a);
+    let (s, c) = a.sin_cos();
+    let t = 1.0 - c;
+    [[c + u * u * t, u * v * t - w * s, u * w * t + v * s],
+     [v * u * t + w * s, c + v * v * t, v * w * t - u * s],
+     [w * u * t - v * s, w * v * t + u * s, c + w * w * t]]
+}
+
 const TOKEN_MESHES: [[&str; 3]; 3] = [
     ["mumbo_tok1_1", "", ""],
     ["mumbo_tok2_1", "mumbo_tok2_2", ""],
@@ -129,7 +165,24 @@ pub unsafe fn orbit_skulls(fighter: &mut L2CFighterCommon, s: &mut MumboState, v
     let i = (s.orbit_t as usize) % ANIM_FRAMES;
     s.orbit_t = s.orbit_t.wrapping_add(1);
     let a = &ANIM[i];
-    rotate_bone(boma, "throw", a[0], a[1], a[2]);
+    // Lévitation (montée/descente du blend) : le jeu ignore set_joint_translate sur les os des
+    // tokens et set_joint_rotate sur les os enfants directs de throw. On incline donc légèrement
+    // le plan de l'orbite (petite rotation de throw autour d'un axe horizontal) : chaque token
+    // monte de ω × p. L'inclinaison est choisie (moindres carrés) pour que le token k suive
+    // BOB décalé de k/n de boucle ; ces décalages réguliers font que la somme des hauteurs,
+    // que l'inclinaison ne peut pas produire, reste ~nulle.
+    // Repère local de throw : Y vertical, le token k est en (-R·sin θk, H, R·cos θk).
+    let (mut wx, mut wz) = (0.0f32, 0.0f32);
+    for k in 0..n {
+        let th = k as f32 * core::f32::consts::TAU / n as f32;
+        let dz = BOB[(i + k * ANIM_FRAMES / n) % ANIM_FRAMES][1];
+        wx -= dz * th.cos();
+        wz -= dz * th.sin();
+    }
+    let c = if n == 1 { 1.0 } else { 2.0 / n as f32 } / ORBIT_RADIUS;
+    let tilt = small_rotation(wx * c, 0.0, wz * c);
+    let [ex, ey, ez] = to_euler_xyz(&mat_mul(&from_euler_xyz(a[0], a[1], a[2]), &tilt));
+    rotate_bone(boma, "throw", ex, ey, ez);
     for k in 0..n {
         // Chaque token joue la même boucle, décalée pour ne pas bouger en même temps.
         let b = &ANIM[(i + k * 137) % ANIM_FRAMES];
