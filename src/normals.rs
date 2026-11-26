@@ -8,11 +8,13 @@ use smashline::*;
 use smash::app::sv_animcmd::{frame, wait};
 use smash::phx::Hash40;
 
-/// Hitbox de bâton : id, os, dégâts, angle, kbg, bkb, taille, décalage Z.
+/// Hitbox de bâton : id, dégâts, angle, kbg, bkb, taille, distance le long du manche
+/// (axe Y local de l'os HaveR, positif vers le crâne, négatif vers le talon).
 macro_rules! stick_hit {
-    ($a:expr, $id:expr, $dmg:expr, $ang:expr, $kbg:expr, $bkb:expr, $size:expr, $z:expr) => {
+    ($a:expr, $id:expr, $dmg:expr, $ang:expr, $kbg:expr, $bkb:expr, $size:expr, $along:expr) => {
+        // 0.0 / $along / 0.0 : un décalage sur Z partirait sur le côté, hors du plan de combat
         macros::ATTACK(
-            $a, $id, 0, Hash40::new("haver"), $dmg, $ang, $kbg, 0, $bkb, $size, 0.0, 0.0, $z,
+            $a, $id, 0, Hash40::new("haver"), $dmg, $ang, $kbg, 0, $bkb, $size, 0.0, $along, 0.0,
             None, None, None, 1.0, 1.0,
             *ATTACK_SETOFF_KIND_ON, *ATTACK_LR_CHECK_F, false, 0, 0.0, 0,
             false, false, false, false, true,
@@ -109,7 +111,7 @@ unsafe extern "C" fn game_attackairn(a: &mut L2CAgentBase) {
 unsafe extern "C" fn game_attackairf(a: &mut L2CAgentBase) {
     frame(a.lua_state_agent, 14.0);
     if macros::is_excute(a) { // coup de tête : sweetspot puis hitbox tardive
-        macros::ATTACK(a, 0, 0, Hash40::new("head"), 13.0, 361, 100, 0, 50, 4.5, 0.0, 1.0, 2.0,
+        macros::ATTACK(a, 0, 0, Hash40::new("head"), 13.0, 361, 100, 0, 50, 4.5, 3.0, 2.0, 0.0, // devant le masque
             None, None, None, 1.0, 1.0, *ATTACK_SETOFF_KIND_ON, *ATTACK_LR_CHECK_F, false, 0, 0.0, 0,
             false, false, false, false, true, *COLLISION_SITUATION_MASK_GA_d, *COLLISION_CATEGORY_MASK_ALL,
             *COLLISION_PART_MASK_ALL, false, Hash40::new("collision_attr_normal"), *ATTACK_SOUND_LEVEL_L,

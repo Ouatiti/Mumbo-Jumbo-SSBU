@@ -212,25 +212,31 @@ emit('a02dash', 25, dash, align_end=(7, 25))
 
 
 # ═════════════ B haut : lévitation vaudoise (bâton en rotor) ═════════════
+ROTOR_TILT = math.radians(26)
+
+
 def hover(f):
     u = f / 45.0
     s1, s2 = math.sin(TAU * u), math.sin(TAU * (u - 0.12))
     s3 = math.sin(TAU * 3 * u)
     th = TAU * 3 * u                                        # 3 tours par boucle
+    ct, st = math.cos(ROTOR_TILT), math.sin(ROTOR_TILT)    # disque incliné : vu de côté, il dessine une ellipse
+    up = smooth01(f / 7)                                    # le bâton monte de la main au-dessus du masque
     return pose(
         yaw=-20.0, hip=(0.18 * s2, -0.15 + 0.3 * s1, 0.0), hrot=(-4 + 3 * s2, 5 * s1, 3 * s1),
         waist=(-4, 0, 0), bust=(-6 + 2 * s1, 4 * s2, 0), head=(-16 + 3 * s2, 14, 4 * s2),
         footL=(0.25 + 0.15 * s1, 0.25 + 0.2 * s2, 0.15 + 0.55 * s2),
         footR=(-0.25 + 0.15 * s1, 0.55 - 0.2 * s2, -0.35 - 0.5 * s2),
         footLrot=(38 + 10 * s2, 10, 0), footRrot=(48 - 10 * s2, -10, 0),
-        gripR=(-4.5, 2.0 + 0.2 * s3, 0.5 + 0.2 * math.cos(TAU * 3 * u)), elbowR=(-0.7, -0.7, -0.2),
+        gripR=(-4.4, -0.6 + 3.6 * up + 0.2 * s3, 0.5 + 0.35 * math.cos(th)), elbowR=(-0.9, -0.4, -0.15),
         gripL=(4.4, -0.7 + 0.35 * s2, 0.8), elbowL=(0.5, -0.8, -0.35),
-        hold=0.0, float_=1.0, floatpos=(0.15 * math.cos(th), 11.9 + 6.9 + 0.18 * s3 + 0.3 * s1, 0.2 + 0.15 * math.sin(th)),
-        staff=(-math.cos(th), 0.07 * math.sin(th * 2), math.sin(th)), fist=0.0,
+        hold=1.0 - up, float_=up,
+        floatpos=(-0.4 + 0.15 * math.cos(th), 20.2 + 0.18 * s3 + 0.3 * s1, 0.2 + 0.15 * math.sin(th)),
+        staff=(-math.cos(th) * ct, -math.cos(th) * st + 0.9 * (1 - up), math.sin(th)), fist=0.0,
     )
 
 
-emit('d02specialairhihold', 45, hover)
+emit('d02specialairhihold', 45, hover)       # le B haut dure 44 frames : joué une seule fois
 emit('d02specialhihold', 45, hover)
 
 
@@ -339,7 +345,7 @@ def fs_charge(f):
 
 
 emit('c03attacks4s', 63, FS, keep_trans=True)
-emit('c03attacks4charge', 60, fs_charge)
+emit('c03attacks4charge', 60, fs_charge, seed=(FS, 11))
 
 
 # ═════════════ B bas : socle de Mumbo (deux tapes, frames 10 et 19) ═════════════
@@ -385,6 +391,36 @@ AIR = pose(
     gripR=(-4.1, -0.9, 0.7), elbowR=(-0.45, -0.1, -0.9), staff=(-0.3, 0.9, 0.3), slide=2.0,
     gripL=(3.9, -1.2, 0.8), elbowL=(0.45, -0.1, -0.9), fist=0.25,
 )
+
+# Chute libre (après le B haut) : épuisé, membres ballants, le bâton traîne derrière lui.
+# Sans ces animations, la chute libre de Ness met la plante des pieds face caméra et le bâton en travers du masque.
+def fall_special(n, lean):
+    def fn(f):
+        th = TAU * f / n
+        s, c = math.sin(th), math.cos(th)
+        p = dict(AIR)
+        p['yaw'] = -24.0
+        p['hrot'] = (9 + 9 * lean + 0.8 * s, 0, 1.0 * c)
+        p['bust'] = (8 + 3 * lean, 0, -0.8 * c)
+        p['head'] = (12 + 1.0 * math.sin(th - 0.8), 10, 2.0 * math.sin(th - 1.2))
+        p['footL'] = (0.45, 0.35 + 0.12 * s, 0.35 - 0.7 * lean)
+        p['footR'] = (-0.45, 0.15 - 0.12 * s, -0.35 - 0.7 * lean)
+        p['footLrot'] = (34 + 2 * s, 8, 0)
+        p['footRrot'] = (40 - 2 * s, -8, 0)
+        p['gripR'] = (-4.3, -1.7 + 0.12 * c, -0.4)
+        p['elbowR'] = (-0.5, 0.15, -0.85)
+        p['staff'] = (-0.35, 0.45 + 0.05 * s, -0.82)
+        p['gripL'] = (4.3, 0.3 + 0.35 * s, 0.6)
+        p['elbowL'] = (0.5, -0.5, -0.7)
+        p['fist'] = 0.0
+        return p
+    return fn
+
+
+for _name, _lean in (('a04fallspecial', 0.0), ('a04fallspecialf', 1.0), ('a04fallspecialb', -1.0)):
+    _n = length(_name)
+    emit(_name, _n, fall_special(_n, _lean))
+
 
 # Aérien avant : coup de tête (touche 14-16), puis revers du bâton (18-22)
 FAIR = Keys(AIR, [
@@ -546,3 +582,7 @@ def win(f):
 
 emit('j02win1', 135, win, align_end=(60, 125))
 emit('j02win1wait', 90, sit_bob)
+
+
+import attacks
+attacks.register(emit, IDLE, AIR, CROUCH)

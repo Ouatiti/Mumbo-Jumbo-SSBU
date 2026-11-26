@@ -411,9 +411,9 @@ def ref_staff(sdir, yaw):
     return Y.rotation_difference(sdir) @ (Quaternion(Y, math.radians(yaw)) @ Quaternion(X, math.radians(-90)))
 
 
-def end_roll(N, fn):
+def end_roll(N, fn, seed=None):
     """vrille (rad) qui manque à la dernière frame pour retrouver l'orientation de référence."""
-    b = Builder()
+    b = seeded(seed)
     for f in range(N + 1):
         p = fn(f)
         b.build(p)
@@ -424,17 +424,27 @@ def end_roll(N, fn):
     return (a + math.pi) % (2 * math.pi) - math.pi
 
 
-def write(out_dir, name, N, fn, keep_trans=False, align_end=None):
+def seeded(seed):
+    """Builder dont le bâton a déjà l'orientation atteinte par `seed` = (fonction, frame) d'une autre anim."""
+    b = Builder()
+    if seed:
+        for f in range(seed[1] + 1):
+            b.build(seed[0](f))
+        b.stats = {'reach': 0.0, 'head': 0, 'where': ''}
+    return b
+
+
+def write(out_dir, name, N, fn, keep_trans=False, align_end=None, seed=None, keep=()):
     """align_end=(a, b) : entre les frames a et b, le bâton rattrape l'orientation attendue par l'anim suivante."""
     # fn(f) -> pose ; N = dernière frame. Écrit <out_dir>/<name>.nuanmb (gabarit = anim de Ness).
     if align_end:
-        ang, base, (r0, r1) = end_roll(N, fn), fn, align_end
+        ang, base, (r0, r1) = end_roll(N, fn, seed), fn, align_end
         fn = lambda f: dict(base(f), roll=ang * smooth01((f - r0) / (r1 - r0)))
         print(f'  raccord {name} : vrille corrigée {math.degrees(ang):.0f} deg')
     a, g, nodes = read_nodes(name)
     a.groups = [g]
     a.final_frame_index = float(N)
-    b = Builder()
+    b = seeded(seed)
     frames, sdirs = [], []
     for f in range(N + 1):
         tl = None
@@ -446,7 +456,7 @@ def write(out_dir, name, N, fn, keep_trans=False, align_end=None):
         sdirs.append(b.staff_prev[0])
     scales = {k: v[0].scale for k, v in read_nodes('a00wait1')[2].items()}
     for nd in g.nodes:
-        if nd.name not in REST_L:
+        if nd.name not in REST_L or nd.name in keep:      # keep : piste de Ness conservée
             continue
         tr = nd.tracks[0]
         sc = scales.get(nd.name, tr.values[0].scale)       # le smash de Ness rétrécit HaveR (sa batte)

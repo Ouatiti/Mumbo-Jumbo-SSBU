@@ -21,6 +21,18 @@ Copier `libmumbo_mod.nro` et `libsmashline_plugin.nro` dans
 `%APPDATA%\Ryujinx\sdcard\atmosphere\contents\01006a800016e000\romfs\skyline\plugins\`.
 Skyline doit être installé dans `mods\contents\01006a800016e000\skyline\exefs\`.
 
+## Modèle et animations
+Dans l'ordre, avec Blender (`blender -b --factory-startup -P <script>` sauf indication) :
+1. `tools/anim/moves.py` puis `tools/anim/lift_head.py` → `tools/anim/out`.
+2. `blender -b mumbo_build/step2.blend -P tools/model/add_tokens.py` → `mumbo_build/out_tok`.
+3. `tools/model/add_staff_bone.py` (à relancer après chaque `add_tokens.py`) : le bâton passe sur
+   l'os `MumboStaff`, car le rendu du jeu n'affiche pas l'animation de `HaveR`.
+4. `tools/model/add_token_tracks.py` → `mumbo_build/out_motion`.
+
+Copier `model.nusktb` et `model.numshb` de `out_tok` et les `.nuanmb` de `out_motion` dans le mod
+(`fighter/ness/{model,motion}/body/c00`), puis vider le cache d'Arcropolis (sauf `offsets.toml`).
+Le modèle et les animations vont ensemble : installer les deux.
+
 ## Tester
 Jouer un match avec Ness, puis chercher `[mumbo_mod]` dans le dossier `Logs` de Ryujinx :
 une ligne « animation '…' introuvable » signale un nom d'animation à corriger dans `src/specials.rs`.

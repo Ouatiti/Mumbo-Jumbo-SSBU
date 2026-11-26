@@ -1,6 +1,5 @@
 b02escapeb
 b02escapef
-c02attacklw3
 e00catchcut
 f00damagelw2
 f00damagelw3
