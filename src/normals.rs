@@ -64,7 +64,13 @@ unsafe extern "C" fn game_attacklw3(a: &mut L2CAgentBase) {
 }
 
 // Smashs
+/// Sans cet indicateur (pose de charge), le smash reste bloqué dans son statut de départ.
+unsafe fn start_smash_hold(a: &mut L2CAgentBase) {
+    WorkModule::on_flag(a.module_accessor, *FIGHTER_STATUS_ATTACK_FLAG_START_SMASH_HOLD);
+}
 unsafe extern "C" fn game_attacks4(a: &mut L2CAgentBase) {
+    frame(a.lua_state_agent, 11.0);
+    if macros::is_excute(a) { start_smash_hold(a); }
     frame(a.lua_state_agent, 18.0);
     if macros::is_excute(a) { // onde de choc au sol devant lui
         stick_hit!(a, 0, 15.0, 42, 95, 0, 6.0, 14.0);
@@ -74,12 +80,16 @@ unsafe extern "C" fn game_attacks4(a: &mut L2CAgentBase) {
     if macros::is_excute(a) { AttackModule::clear_all(a.module_accessor); }
 }
 unsafe extern "C" fn game_attackhi4(a: &mut L2CAgentBase) {
+    frame(a.lua_state_agent, 11.0);
+    if macros::is_excute(a) { start_smash_hold(a); }
     frame(a.lua_state_agent, 14.0);
     if macros::is_excute(a) { stick_hit!(a, 0, 14.0, 88, 100, 0, 7.0, 4.0); } // explosion au-dessus du bâton
     wait(a.lua_state_agent, 4.0);
     if macros::is_excute(a) { AttackModule::clear_all(a.module_accessor); }
 }
 unsafe extern "C" fn game_attacklw4(a: &mut L2CAgentBase) {
+    frame(a.lua_state_agent, 6.0);
+    if macros::is_excute(a) { start_smash_hold(a); }
     frame(a.lua_state_agent, 13.0);
     if macros::is_excute(a) { // deux geysers de part et d'autre
         stick_hit!(a, 0, 13.0, 75, 100, 0, 5.5, 14.0);

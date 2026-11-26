@@ -171,6 +171,7 @@ unsafe extern "C" fn special_n_loop(fighter: &mut L2CFighterCommon) -> L2CValue 
             s.fire_frame = s.timer;
             let l = s.zap_lvl as usize;
             println!("[mumbo_mod] Zap tiré : palier {} à la frame {}", l, s.timer);
+            set_motion(fighter, "special_n_fire", "special_air_n_fire");
             hit(fighter, 0, ZAP_DMG[l], 361, ZAP_KBG[l], 0, ZAP_BKB[l], ZAP_SIZE[l], 8.0, 8.0,
                 Some(8.0 + ZAP_LEN[l]), 0, "collision_attr_elec");
             purple_flash(fighter, "sys_hit_elec", 0.6 + 0.4 * s.zap_lvl as f32);

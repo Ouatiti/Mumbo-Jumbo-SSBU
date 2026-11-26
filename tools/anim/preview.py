@@ -31,17 +31,21 @@ for o in list(bpy.data.objects):
     if o.type in ('CAMERA', 'LIGHT'): bpy.data.objects.remove(o)
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam'))
 sc.collection.objects.link(cam); sc.camera = cam
-cam.data.type = 'ORTHO'; cam.data.ortho_scale = 18
-views = {'front': ((0, -30, 7.5), (math.radians(90), 0, 0)), 'side': ((30, 0, 7.5), (math.radians(90), 0, math.radians(90))),
-         'game': ((-30, 0, 7.5), (math.radians(90), 0, math.radians(-90)))}
+cam.data.type = 'ORTHO'; cam.data.ortho_scale = float(os.environ.get('PV_SCALE', '18'))
+CZ = float(os.environ.get('PV_CZ', '7.5'))
+views = {'front': ((0, -30, CZ), (math.radians(90), 0, 0)), 'side': ((30, 0, CZ), (math.radians(90), 0, math.radians(90))),
+         'game': ((-30, 0, CZ), (math.radians(90), 0, math.radians(-90))),
+         'q': ((-21.2, -21.2, CZ), (math.radians(90), 0, math.radians(-45))),
+         'top': ((0, 0, 40), (0, 0, 0))}
 views = {k: views[k] for k in os.environ.get('PV_VIEWS', 'front,side').split(',')}
 tiles = []
 tmp = os.path.join(os.path.dirname(out), '_t.png')
 for v, (loc, rot) in views.items():
     row = []
     cam.location = loc; cam.rotation_euler = rot
-    for k in range(n):
-        f = int(fr[0] + (fr[1] - fr[0]) * k / max(1, n - 1))
+    picks = [int(x) for x in os.environ.get('PV_FRAMES', '').split(',') if x]
+    for k in range(n if not picks else len(picks)):
+        f = picks[k] if picks else int(fr[0] + (fr[1] - fr[0]) * k / max(1, n - 1))
         sc.frame_set(f)
         sc.render.filepath = tmp; bpy.ops.render.render(write_still=True)
         img = bpy.data.images.load(tmp); px = np.array(img.pixels[:]).reshape(RY, RX, 4)[::-1, :, :3]

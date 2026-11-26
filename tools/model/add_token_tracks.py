@@ -31,6 +31,28 @@ for b in ssbh.skel_data.read_skel(SKEL).bones:
         rest[b.name] = A.Transform(list(sc), [q.x, q.y, q.z, q.w], list(loc))
 print("TOK BONES", len(rest))
 
+def trans_node(grp):
+    return next((nd for nd in grp.nodes if nd.name == "Trans"), None)
+
+
+def moves(node):
+    v = node.tracks[0].values
+    return any(max(x.translation[i] for x in v) - min(x.translation[i] for x in v) > 0.01 for i in range(3))
+
+
+def restore_root_motion(f, grp):
+    """Le jeu deplace le personnage d'apres l'os Trans (marche, course, double saut) : une animation
+    Mumbo qui le fige le cloue sur place. On reprend alors la piste Trans de Ness (les autres os sont
+    relatifs a Trans, la pose ne change pas)."""
+    van = A.read_anim(os.path.join(VANILLA, f))
+    vgrp = next(g for g in van.groups if "Transform" in repr(g.group_type))
+    mine, ref = trans_node(grp), trans_node(vgrp)
+    if mine is None or ref is None or not moves(ref) or moves(mine):
+        return
+    mine.tracks = ref.tracks
+    print("ROOT MOTION", f)
+
+
 n = 0
 for f in sorted(os.listdir(VANILLA)):
     if not f.endswith(".nuanmb"):
@@ -41,6 +63,8 @@ for f in sorted(os.listdir(VANILLA)):
     if grp is None:
         continue
     have = {nd.name for nd in grp.nodes}
+    if src.startswith(CUSTOM):
+        restore_root_motion(f, grp)
     for name, tr in rest.items():
         if name in have:
             continue
@@ -49,6 +73,9 @@ for f in sorted(os.listdir(VANILLA)):
         node = A.NodeData(name)
         node.tracks = [track]
         grp.nodes.append(node)
+    # Les os doivent rester tries par nom comme dans les fichiers du jeu : sinon le jeu ne retrouve
+    # plus Trans et les mouvements pilotes par l'animation (marche, course, double saut) restent sur place.
+    grp.nodes = sorted(grp.nodes, key=lambda nd: nd.name)
     anim.save(os.path.join(OUT, f))
     n += 1
 print("WROTE", n)
